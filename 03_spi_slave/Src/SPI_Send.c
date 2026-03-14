@@ -34,7 +34,7 @@ void SPI_GPIOInits(void)
 	SPIPins.GPIO_PinConfig.GPIO_PinAltFunMode = 0; // AF0 for SPI1
 	SPIPins.GPIO_PinConfig.GPIO_PinOPType = GPIO_OP_TYPE_PP;
 	SPIPins.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_NO_PUPD;
-	SPIPins.GPIO_PinConfig.GPIO_PinSpeed = GPIO_SPEED_FAST;
+	SPIPins.GPIO_PinConfig.GPIO_PinSpeed = GPIO_SPEED_LOW;
 
 	// SCLK
 	SPIPins.GPIO_PinConfig.GPIO_PinNumber = GPIO_NO_5;
@@ -60,7 +60,7 @@ void SPI1_Inits(void)
 	SPI1handle.pSPIx = SPI1;
 	SPI1handle.SPIConfig.SPI_BusConfig = SPI_BUS_CONFIG_FD;
 	SPI1handle.SPIConfig.SPI_DeviceMode = SPI_DEVICE_MASTER_MODE;
-	SPI1handle.SPIConfig.SPI_SclkSpeed = SPI_SCLK_SPEED_DIV32; // 8 MHz
+	SPI1handle.SPIConfig.SPI_SclkSpeed = SPI_SCLK_SPEED_DIV256; // 8 MHz
 	SPI1handle.SPIConfig.SPI_CPHA = SPI_CPHA_LOW;
 	SPI1handle.SPIConfig.SPI_CPOL = SPI_CPOL_LOW;
 	SPI1handle.SPIConfig.SPI_DS = SPI_DS_8BITS;
@@ -130,5 +130,4 @@ void EXTI4_15_IRQHandler(void)
 
 	SPI_PCtrl(SPI1, PERIPH_DISABLE);
 }
-
 

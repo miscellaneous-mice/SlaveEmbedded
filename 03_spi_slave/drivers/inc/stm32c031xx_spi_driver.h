@@ -28,6 +28,7 @@ typedef struct {
 	uint8_t SPI_CPOL;
 	uint8_t SPI_CPHA;
 	uint8_t SPI_SSM;
+	uint8_t SPI_Endian;
 } SPI_Config_t;
 
 typedef struct {
@@ -172,6 +173,15 @@ typedef enum {
 	SPI_SSM_DI = 0,  // default
 	SPI_SSM_EN
 } SPI_CPHA_t;
+
+
+/*
+ * @SPI_Endian
+ */
+typedef enum {
+	SPI_big_end = 0,
+	SPI_little_end,
+} SPI_Endian_t;
 
 
 /************ SPI functionality *****************/

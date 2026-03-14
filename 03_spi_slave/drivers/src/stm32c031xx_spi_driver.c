@@ -55,11 +55,13 @@ PeriphStatus_t SPI_Init(SPI_Handle_t *pSPIHandle)
 	if (pSPIHandle->SPIConfig.SPI_BusConfig == SPI_BUS_CONFIG_FD)
 	{
 		// bidi mode should be cleared
+		tempreg &= ~(1 << SPI_CR1_RXONLY);
 		tempreg &= ~(1 << SPI_CR1_BIDIMODE);
 	}
 	else if (pSPIHandle->SPIConfig.SPI_BusConfig == SPI_BUS_CONFIG_HD)
 	{
 		// bidi mode should be cleared
+		tempreg &= ~(1 << SPI_CR1_RXONLY);
 		tempreg |= (1 << SPI_CR1_BIDIMODE);
 	}
 	else if (pSPIHandle->SPIConfig.SPI_BusConfig == SPI_BUS_CONFIG_S_RXONLY)
@@ -85,6 +87,8 @@ PeriphStatus_t SPI_Init(SPI_Handle_t *pSPIHandle)
 	tempreg |= pSPIHandle->SPIConfig.SPI_CPHA << SPI_CR1_CPHA;
 
 	tempreg |= pSPIHandle->SPIConfig.SPI_SSM << SPI_CR1_SSM;
+
+	tempreg |= pSPIHandle->SPIConfig.SPI_Endian << SPI_CR1_LSBFIRST;
 
 	pSPIHandle->pSPIx->CR1 = tempreg;
 	return status;
