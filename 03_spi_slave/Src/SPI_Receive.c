@@ -72,9 +72,12 @@ void SPI1_Inits(void)
 
 int main(void)
 {
-	char user_data[] = "..... .....";
+//	char user_data[] = "..... .....";
+	uint8_t byte;
 
 	initialise_monitor_handles();
+
+	printf("Hello world\n");
 
 	init_systick(1000, 0);
 
@@ -82,13 +85,20 @@ int main(void)
 
 	SPI1_Inits();
 
-	SPI_SSIConfig(SPI1, PERIPH_ENABLE);
+	SPI_SSIConfig(SPI1, PERIPH_DISABLE);
 
 	SPI_PCtrl(SPI1, PERIPH_ENABLE);
 
-	SPI_ReceiveData(SPI1, (uint8_t*)user_data, strlen(user_data));
+	while (1)
+	{
+		SPI_ReceiveData(SPI1, &byte, 1);
 
-	printf(user_data);
+		delay_ms(1000);
+
+		while(SPI_GetFlagStatus(SPI1, SPI_BUSY_FLAG));
+
+		printf("data received : %d\n", byte);
+	}
 
 	SPI_PCtrl(SPI1, PERIPH_DISABLE);
 

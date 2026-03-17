@@ -34,7 +34,7 @@ void SPI_GPIOInits(void)
 	SPIPins.GPIO_PinConfig.GPIO_PinAltFunMode = 0; // AF0 for SPI1
 	SPIPins.GPIO_PinConfig.GPIO_PinOPType = GPIO_OP_TYPE_PP;
 	SPIPins.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_NO_PUPD;
-	SPIPins.GPIO_PinConfig.GPIO_PinSpeed = GPIO_SPEED_LOW;
+	SPIPins.GPIO_PinConfig.GPIO_PinSpeed = GPIO_SPEED_HIGH;
 
 	// SCLK
 	SPIPins.GPIO_PinConfig.GPIO_PinNumber = GPIO_NO_5;
@@ -60,7 +60,7 @@ void SPI1_Inits(void)
 	SPI1handle.pSPIx = SPI1;
 	SPI1handle.SPIConfig.SPI_BusConfig = SPI_BUS_CONFIG_FD;
 	SPI1handle.SPIConfig.SPI_DeviceMode = SPI_DEVICE_MASTER_MODE;
-	SPI1handle.SPIConfig.SPI_SclkSpeed = SPI_SCLK_SPEED_DIV256; // 8 MHz
+	SPI1handle.SPIConfig.SPI_SclkSpeed = SPI_SCLK_SPEED_DIV8; // 8 MHz
 	SPI1handle.SPIConfig.SPI_CPHA = SPI_CPHA_LOW;
 	SPI1handle.SPIConfig.SPI_CPOL = SPI_CPOL_LOW;
 	SPI1handle.SPIConfig.SPI_DS = SPI_DS_8BITS;
@@ -98,19 +98,25 @@ void Button_Init(void)
 
 int main(void) {
 
-	initialise_monitor_handles();
+	char user_data[] = "Hello world";
 
-	init_systick(1000, 0);
+//	initialise_monitor_handles();
+
+//	init_systick(1000, 0);
 
 	SPI_GPIOInits();
 
-	Button_Init();
+//	Button_Init();
 
 	SPI1_Inits();
 
 	SPI_SSIConfig(SPI1, PERIPH_ENABLE);
 
 	SPI_PCtrl(SPI1, PERIPH_ENABLE);
+
+	SPI_SendData(SPI1, (uint8_t*)user_data, strlen(user_data));
+
+	SPI_PCtrl(SPI1, PERIPH_DISABLE);
 
 	for(;;);
 
@@ -123,6 +129,8 @@ void EXTI4_15_IRQHandler(void)
 	GPIO_IRQHandling(GPIO_NO_13);
 
 	delay_ms(1000);
+
+	SPI_PCtrl(SPI1, PERIPH_ENABLE);
 
 	char user_data[] = "Hello world";
 

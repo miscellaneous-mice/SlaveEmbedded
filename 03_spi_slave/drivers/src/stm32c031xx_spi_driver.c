@@ -88,7 +88,7 @@ PeriphStatus_t SPI_Init(SPI_Handle_t *pSPIHandle)
 
 	tempreg |= pSPIHandle->SPIConfig.SPI_SSM << SPI_CR1_SSM;
 
-	tempreg |= pSPIHandle->SPIConfig.SPI_Endian << SPI_CR1_LSBFIRST;
+//	tempreg |= pSPIHandle->SPIConfig.SPI_Endian << SPI_CR1_LSBFIRST;
 
 	pSPIHandle->pSPIx->CR1 = tempreg;
 	return status;

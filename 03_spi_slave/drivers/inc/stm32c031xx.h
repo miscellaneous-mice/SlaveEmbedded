@@ -470,11 +470,11 @@ typedef enum {
     PERIPH_RESET
 } PeriphState_t;
 
-#define GPIO_PIN_SET		PERIPH_SET
-#define GPIO_PIN_RESET		PERIPH_RESET
+#define GPIO_PIN_SET		1
+#define GPIO_PIN_RESET		0
 
-#define SPI_FLAG_SET		PERIPH_SET
-#define SPI_FLAG_RESET		PERIPH_RESET
+#define SPI_FLAG_SET		1
+#define SPI_FLAG_RESET		0
 
 /*
  * Return types
