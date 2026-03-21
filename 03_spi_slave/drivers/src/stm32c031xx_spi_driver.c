@@ -42,55 +42,61 @@ PeriphStatus_t SPI_PClkCtrl(SPI_RegDef_t *pSPIx, PeriphState_t pState)
  */
 PeriphStatus_t SPI_Init(SPI_Handle_t *pSPIHandle)
 {
-	uint32_t tempreg = 0;
+	uint32_t tempreg_cr1 = 0;
+	uint32_t tempreg_cr2 = 0;
 	PeriphStatus_t status = PERIPH_OK;
 
 	// enable peripheral clock
 	SPI_PClkCtrl(pSPIHandle->pSPIx, PERIPH_ENABLE);
 
 	// 1. Configure the device mode
-	tempreg |= pSPIHandle->SPIConfig.SPI_DeviceMode << SPI_CR1_MSTR;
+	tempreg_cr1 |= pSPIHandle->SPIConfig.SPI_DeviceMode << SPI_CR1_MSTR;
 
 	// 2. Configure the bus config
 	if (pSPIHandle->SPIConfig.SPI_BusConfig == SPI_BUS_CONFIG_FD)
 	{
 		// bidi mode should be cleared
-		tempreg &= ~(1 << SPI_CR1_RXONLY);
-		tempreg &= ~(1 << SPI_CR1_BIDIMODE);
+		tempreg_cr1 &= ~(1 << SPI_CR1_RXONLY);
+		tempreg_cr1 &= ~(1 << SPI_CR1_BIDIMODE);
 	}
 	else if (pSPIHandle->SPIConfig.SPI_BusConfig == SPI_BUS_CONFIG_HD)
 	{
 		// bidi mode should be cleared
-		tempreg &= ~(1 << SPI_CR1_RXONLY);
-		tempreg |= (1 << SPI_CR1_BIDIMODE);
+		tempreg_cr1 &= ~(1 << SPI_CR1_RXONLY);
+		tempreg_cr1 |= (1 << SPI_CR1_BIDIMODE);
 	}
 	else if (pSPIHandle->SPIConfig.SPI_BusConfig == SPI_BUS_CONFIG_S_RXONLY)
 	{
 		// bidi mode should be cleared
-		tempreg &= ~(1 << SPI_CR1_BIDIMODE);
+		tempreg_cr1 &= ~(1 << SPI_CR1_BIDIMODE);
 
 		// RXOnly bit should be set
-		tempreg |= (1 << SPI_CR1_RXONLY);
+		tempreg_cr1 |= (1 << SPI_CR1_RXONLY);
 	}
 
 	// 3. Configure the spi serial clock speed (baud rate)
-	tempreg |= pSPIHandle->SPIConfig.SPI_SclkSpeed << SPI_CR1_BR;
+	tempreg_cr1 |= pSPIHandle->SPIConfig.SPI_SclkSpeed << SPI_CR1_BR;
 
-	//4.  Configure the DFF
-	pSPIHandle->pSPIx->CR2 &= ~(0xF << SPI_CR2_DS);
-	pSPIHandle->pSPIx->CR2 |= (pSPIHandle->SPIConfig.SPI_DS << SPI_CR2_DS);
+	//4.  Configure the FIFO Rx threshold
+	tempreg_cr2 |= (pSPIHandle->SPIConfig.SPI_FRXTH << SPI_CR2_FRXTH);
 
-	//5. configure the CPOL
-	tempreg |= pSPIHandle->SPIConfig.SPI_CPOL << SPI_CR1_CPOL;
+	// 5. Configure the DFF
+	tempreg_cr2 |= (pSPIHandle->SPIConfig.SPI_DS << SPI_CR2_DS);
 
-	//6 . configure the CPHA
-	tempreg |= pSPIHandle->SPIConfig.SPI_CPHA << SPI_CR1_CPHA;
+	// 6. configure the CPOL
+	tempreg_cr1 |= pSPIHandle->SPIConfig.SPI_CPOL << SPI_CR1_CPOL;
 
-	tempreg |= pSPIHandle->SPIConfig.SPI_SSM << SPI_CR1_SSM;
+	// 7. configure the CPHA
+	tempreg_cr1 |= pSPIHandle->SPIConfig.SPI_CPHA << SPI_CR1_CPHA;
 
-//	tempreg |= pSPIHandle->SPIConfig.SPI_Endian << SPI_CR1_LSBFIRST;
+	// 8. Configure the software slave management
+	tempreg_cr1 |= pSPIHandle->SPIConfig.SPI_SSM << SPI_CR1_SSM;
 
-	pSPIHandle->pSPIx->CR1 = tempreg;
+	// 9. Configure data endianess
+	tempreg_cr1 |= pSPIHandle->SPIConfig.SPI_Endian << SPI_CR1_LSBFIRST;
+
+	pSPIHandle->pSPIx->CR1 = tempreg_cr1;
+	pSPIHandle->pSPIx->CR2 = tempreg_cr2;
 	return status;
 }
 

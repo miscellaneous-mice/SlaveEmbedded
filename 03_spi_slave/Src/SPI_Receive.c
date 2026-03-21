@@ -23,6 +23,9 @@
 #include "stm32c031xx_systick_timer.h"
 #include "stm32c031xx_spi_driver.h"
 
+#define ACK  0xF5
+#define NACK 0xFF
+
 extern void initialise_monitor_handles(void);
 
 void SPI_GPIOInits(void)
@@ -56,15 +59,17 @@ void SPI_GPIOInits(void)
 
 void SPI1_Inits(void)
 {
-	SPI_Handle_t SPI1handle;
-	SPI1handle.pSPIx = SPI1;
-	SPI1handle.SPIConfig.SPI_BusConfig = SPI_BUS_CONFIG_FD;
-	SPI1handle.SPIConfig.SPI_DeviceMode = SPI_DEVICE_SLAVE_MODE;
-	SPI1handle.SPIConfig.SPI_SclkSpeed = SPI_SCLK_SPEED_DIV2; // 8 MHz
-	SPI1handle.SPIConfig.SPI_CPHA = SPI_CPHA_LOW;
-	SPI1handle.SPIConfig.SPI_CPOL = SPI_CPOL_LOW;
-	SPI1handle.SPIConfig.SPI_DS = SPI_DS_8BITS;
-	SPI1handle.SPIConfig.SPI_SSM = SPI_SSM_EN; // software slave management for NSS pin
+    SPI_Handle_t SPI1handle;
+    SPI1handle.pSPIx                       = SPI1;
+    SPI1handle.SPIConfig.SPI_BusConfig     = SPI_BUS_CONFIG_FD;
+    SPI1handle.SPIConfig.SPI_DeviceMode    = SPI_DEVICE_SLAVE_MODE;
+    SPI1handle.SPIConfig.SPI_SclkSpeed     = SPI_SCLK_SPEED_DIV2;
+    SPI1handle.SPIConfig.SPI_CPHA          = SPI_CPHA_LOW;
+    SPI1handle.SPIConfig.SPI_CPOL          = SPI_CPOL_LOW;
+    SPI1handle.SPIConfig.SPI_DS            = SPI_DS_8BITS;
+    SPI1handle.SPIConfig.SPI_SSM           = SPI_SSM_DI;
+    SPI1handle.SPIConfig.SPI_Endian		   = SPI_little_end;
+    SPI1handle.SPIConfig.SPI_FRXTH		   = SPI_RXNE_8;
 
 	(void)SPI_Init(&SPI1handle);
 }
@@ -73,7 +78,9 @@ void SPI1_Inits(void)
 int main(void)
 {
 //	char user_data[] = "..... .....";
-	uint8_t byte;
+	uint8_t byte, idx = 0;
+	uint8_t ack = ACK, dummy;
+	uint8_t cmd[5] = {10, 20, 30, 40, 50};
 
 	initialise_monitor_handles();
 
@@ -85,7 +92,7 @@ int main(void)
 
 	SPI1_Inits();
 
-	SPI_SSIConfig(SPI1, PERIPH_DISABLE);
+	SPI_SSOEConfig(SPI1, PERIPH_DISABLE);
 
 	SPI_PCtrl(SPI1, PERIPH_ENABLE);
 
@@ -93,9 +100,15 @@ int main(void)
 	{
 		SPI_ReceiveData(SPI1, &byte, 1);
 
-		delay_ms(1000);
+		ack = (byte == cmd[idx]) ? ACK : NACK;
+
+		SPI_SendData(SPI1, &ack, 1);
+
+		SPI_ReceiveData(SPI1, &dummy, 1);
 
 		printf("data received : %d\n", byte);
+
+		idx = (idx + 1) % 5;
 	}
 
 	SPI_PCtrl(SPI1, PERIPH_DISABLE);

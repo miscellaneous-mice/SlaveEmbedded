@@ -93,6 +93,8 @@ void SPI1_Inits(void)
     SPI1handle.SPIConfig.SPI_CPOL          = SPI_CPOL_LOW;
     SPI1handle.SPIConfig.SPI_DS            = SPI_DS_8BITS;
     SPI1handle.SPIConfig.SPI_SSM           = SPI_SSM_DI;
+    SPI1handle.SPIConfig.SPI_Endian		   = SPI_little_end;
+    SPI1handle.SPIConfig.SPI_FRXTH		   = SPI_RXNE_8;
     (void)SPI_Init(&SPI1handle);
 }
 
