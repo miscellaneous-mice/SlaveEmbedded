@@ -133,7 +133,6 @@ int main(void)
 
         // Step 1: receive command byte
         SPI_ReceiveData(SPI1, &command, 1);
-        printf("RAW command byte: 0x%02X\n", command);  // add this
 
         // Step 2: pre-load ACK/NACK so it's ready when master sends dummy
         ackornack = checkData(command);
