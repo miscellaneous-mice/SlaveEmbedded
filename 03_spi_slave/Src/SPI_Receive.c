@@ -95,8 +95,6 @@ int main(void)
 
 		delay_ms(1000);
 
-		while(SPI_GetFlagStatus(SPI1, SPI_BUSY_FLAG));
-
 		printf("data received : %d\n", byte);
 	}
 

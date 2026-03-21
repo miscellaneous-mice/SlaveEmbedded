@@ -153,6 +153,8 @@ PeriphStatus_t SPI_SendData(SPI_RegDef_t *pSPIx, uint8_t *pTxBuffer, uint32_t le
         }
     }
 
+    while(SPI_GetFlagStatus(pSPIx, SPI_BUSY_FLAG));
+
     return status;
 }
 
@@ -186,6 +188,8 @@ PeriphStatus_t SPI_ReceiveData(SPI_RegDef_t *pSPIx, uint8_t *pRxBuffer, uint32_t
             len--;
         }
     }
+
+    while(SPI_GetFlagStatus(pSPIx, SPI_BUSY_FLAG));
 
     return status;
 }

@@ -13,14 +13,59 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <math.h>
 
 extern void initialise_monitor_handles(void);
+
+
+static uint32_t rng_state;
+
+void rng_seed(uint32_t seed) {
+    rng_state = seed;
+}
+
+uint32_t rng_next() {
+    rng_state = (1664525 * rng_state + 1013904223);
+    return rng_state;
+}
+
+// Uniform [0,1)
+float rng_uniform() {
+    return (rng_next() >> 8) * (1.0f / 16777216.0f);
+}
+
+// ---------------- Normal Distribution ----------------
+float rng_normal(float mean, float stddev) {
+    float u, v, s;
+
+    do {
+        u = 2.0f * rng_uniform() - 1.0f;
+        v = 2.0f * rng_uniform() - 1.0f;
+        s = u*u + v*v;
+    } while (s >= 1.0f || s == 0.0f);
+
+    float mul = sqrtf(-2.0f * logf(s) / s);
+    return mean + stddev * u * mul;
+}
+
+uint8_t rng_normal_u16(uint32_t seed, float mean, float stddev) {
+    rng_seed(seed);
+
+    float val = rng_normal(mean, stddev);
+
+    return (uint8_t)val;
+}
+
 
 int main(void)
 {
 	initialise_monitor_handles();
 
 	printf("Hello world\n");
+
+	uint8_t value = rng_normal_u16(12345, 30000.0f, 5000.0f);
+
+	printf("Value : %d\n", value);
 
 	for(;;);
 }
