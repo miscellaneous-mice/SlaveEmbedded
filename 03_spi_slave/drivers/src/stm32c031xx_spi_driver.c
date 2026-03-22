@@ -95,6 +95,22 @@ PeriphStatus_t SPI_Init(SPI_Handle_t *pSPIHandle)
 	// 9. Configure data endianess
 	tempreg_cr1 |= pSPIHandle->SPIConfig.SPI_Endian << SPI_CR1_LSBFIRST;
 
+	if(pSPIHandle->SPIConfig.SPI_CRCCalculation == SPI_CRC_EN)
+	{
+		pSPIHandle->pSPIx->CRCPR = pSPIHandle->SPIConfig.SPI_CRCPolynomial;
+
+		tempreg_cr1 |= (1 << SPI_CR1_CRCEN);
+
+		if (pSPIHandle->SPIConfig.SPI_DS <= SPI_DS_8BITS)
+		{
+			tempreg_cr1 &= ~(1 << SPI_CR1_CRCL);
+		}
+		else
+		{
+			tempreg_cr1 |= (1 << SPI_CR1_CRCL);
+		}
+	}
+
 	pSPIHandle->pSPIx->CR1 = tempreg_cr1;
 	pSPIHandle->pSPIx->CR2 = tempreg_cr2;
 	return status;
@@ -136,6 +152,7 @@ PeriphStatus_t SPI_SendData(SPI_RegDef_t *pSPIx, uint8_t *pTxBuffer, uint32_t le
 
     uint32_t ds = (pSPIx->CR2 >> SPI_CR2_DS) & 0xF;
     uint32_t dataSize = ds + 1;   // actual bits
+    uint8_t crc_en = (pSPIx->CR1 & (1 << SPI_CR1_CRCEN)) ? 1 : 0;
 
     while (len > 0)
     {
@@ -157,8 +174,14 @@ PeriphStatus_t SPI_SendData(SPI_RegDef_t *pSPIx, uint8_t *pTxBuffer, uint32_t le
             pTxBuffer++;
             len--;
         }
+
+        if (crc_en && len == 0)
+        {
+			pSPIx->CR1 |= (1 << SPI_CR1_CRCNEXT);
+        }
     }
 
+    while(SPI_GetFlagStatus(pSPIx, SPI_TXE_FLAG) == SPI_FLAG_RESET);
     while(SPI_GetFlagStatus(pSPIx, SPI_BUSY_FLAG));
 
     return status;
@@ -170,12 +193,22 @@ PeriphStatus_t SPI_ReceiveData(SPI_RegDef_t *pSPIx, uint8_t *pRxBuffer, uint32_t
     PeriphStatus_t status = PERIPH_OK;
 
     uint32_t ds = (pSPIx->CR2 >> SPI_CR2_DS) & 0xF;
+    uint8_t crc_en = (pSPIx->CR1 & (1 << SPI_CR1_CRCEN)) ? 1 : 0;
+	uint8_t crc_ff = (pSPIx->CR1 & (1 << SPI_CR1_CRCL)) ? 1 : 0;
     uint32_t dataSize = ds + 1;
 
     while (len > 0)
     {
         // 1. Wait until RXNE is set
         while (SPI_GetFlagStatus(pSPIx, SPI_RXNE_FLAG) == SPI_FLAG_RESET);
+
+        if (crc_en)
+        {
+        	if ((!crc_ff && len == 1) || (crc_ff && len == 2))
+			{
+        		pSPIx->CR1 |= (1 << SPI_CR1_CRCNEXT);
+			}
+        }
 
         if (dataSize > 8)
         {
@@ -193,6 +226,18 @@ PeriphStatus_t SPI_ReceiveData(SPI_RegDef_t *pSPIx, uint8_t *pRxBuffer, uint32_t
             pRxBuffer++;
             len--;
         }
+    }
+
+    if (crc_en)
+    {
+    	if (SPI_GetFlagStatus(pSPIx, SPI_CRCERR_FLAG))
+    	{
+    		status = PERIPH_ERROR;
+    		pSPIx->SR &= ~(1 << SPI_SR_CRCERR);
+    	}
+
+    	volatile uint32_t dummy = pSPIx->DR;
+    	(void)dummy;
     }
 
     while(SPI_GetFlagStatus(pSPIx, SPI_BUSY_FLAG));

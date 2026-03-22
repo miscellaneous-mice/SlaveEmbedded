@@ -16,6 +16,7 @@
 #define SPI_TXE_FLAG	(1 << SPI_SR_TXE)
 #define SPI_RXNE_FLAG	(1 << SPI_SR_RXNE)
 #define SPI_BUSY_FLAG	(1 << SPI_SR_BSY)
+#define SPI_CRCERR_FLAG (1 << SPI_SR_CRCERR)
 
 
 /************ Important configuration structures *************/
@@ -30,6 +31,8 @@ typedef struct {
 	uint8_t SPI_SSM;
 	uint8_t SPI_Endian;
 	uint8_t SPI_FRXTH;
+	uint8_t SPI_CRCCalculation;
+	uint8_t SPI_CRCPolynomial;
 } SPI_Config_t;
 
 typedef struct {
@@ -189,6 +192,11 @@ typedef enum {
 	SPI_RXNE_8,
 } SPI_FRXTH_t;
 
+typedef enum {
+	SPI_CRC_DI = 0,
+	SPI_CRC_EN,
+} SPI_CRC_t;
+
 
 /************ SPI functionality *****************/
 
@@ -226,6 +234,7 @@ uint32_t SPI_GetFlagStatus(SPI_RegDef_t *pSPIx, uint32_t FlagName);
 void SPI_PCtrl(SPI_RegDef_t *pSPIx, PeriphState_t pState);
 void SPI_SSIConfig(SPI_RegDef_t *pSPIx, PeriphState_t pState);
 void SPI_SSOEConfig(SPI_RegDef_t *pSPIx, PeriphState_t pState);
+void SPI_ClearCRC(SPI_RegDef_t *pSPIx);
 
 
 #endif /* INC_STM32C031XX_SPI_DRIVER_H_ */

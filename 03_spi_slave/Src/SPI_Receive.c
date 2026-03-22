@@ -71,6 +71,9 @@ void SPI1_Inits(void)
     SPI1handle.SPIConfig.SPI_Endian		   = SPI_little_end;
     SPI1handle.SPIConfig.SPI_FRXTH		   = SPI_RXNE_8;
 
+    SPI1handle.SPIConfig.SPI_CRCCalculation = SPI_CRC_EN;
+    SPI1handle.SPIConfig.SPI_CRCPolynomial = 0x07;
+
 	(void)SPI_Init(&SPI1handle);
 }
 
