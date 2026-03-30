@@ -71,7 +71,7 @@ void SPI1_Inits(void)
     SPI1handle.SPIConfig.SPI_Endian		   = SPI_little_end;
     SPI1handle.SPIConfig.SPI_FRXTH		   = SPI_RXNE_8;
 
-    SPI1handle.SPIConfig.SPI_CRCCalculation = SPI_CRC_DI;
+    SPI1handle.SPIConfig.SPI_CRCCalculation = SPI_CRC_EN;
     SPI1handle.SPIConfig.SPI_CRCPolynomial = 0x07;
 
 	(void)SPI_Init(&SPI1handle);
@@ -80,44 +80,40 @@ void SPI1_Inits(void)
 
 int main(void)
 {
-//	char user_data[] = "..... .....";
-	uint8_t byte, idx = 0;
-	uint8_t ack = ACK, dummy;
-	uint8_t cmd[5] = {10, 20, 30, 40, 50};
+    uint8_t cmd_rx, ack_tx, dummy_rx;
+    uint8_t dummy_tx = NACK; // 0xFF
+    uint8_t cmd[5] = {10, 20, 30, 40, 50};
+    uint8_t idx = 0;
 
-	initialise_monitor_handles();
+    initialise_monitor_handles();
+    init_systick(1000, 0);
+    SPI_GPIOInits();
+    SPI1_Inits();
+    SPI_SSOEConfig(SPI1, PERIPH_DISABLE);
 
-	printf("Hello world\n");
+    printf("Slave Ready\n");
 
-	init_systick(1000, 0);
+    while (1)
+    {
+        // --- PHASE 1: Wait for and Receive Command ---
+        SPI_PCtrl(SPI1, PERIPH_ENABLE);
+        if(SPI_TransmitReceiveData(SPI1, &dummy_tx, &cmd_rx, 1) == PERIPH_ERROR) {
+            printf("Slave CRC Error on Phase 1\n");
+        }
+        // Immediately reset CRC calculator when the CS boundary ends
+        SPI_ClearCRC(SPI1);
 
-	SPI_GPIOInits();
+        // Evaluate Command
+        ack_tx = (cmd_rx == cmd[idx]) ? ACK : NACK;
 
-	SPI1_Inits();
+        // --- PHASE 2: Transmit the prepared ACK ---
+        SPI_PCtrl(SPI1, PERIPH_ENABLE);
+        if(SPI_TransmitReceiveData(SPI1, &ack_tx, &dummy_rx, 1) == PERIPH_ERROR) {
+            printf("Slave CRC Error on Phase 2\n");
+        }
+        SPI_ClearCRC(SPI1);
 
-	SPI_SSOEConfig(SPI1, PERIPH_DISABLE);
-
-	SPI_PCtrl(SPI1, PERIPH_ENABLE);
-
-	while (1)
-	{
-		SPI_ReceiveData(SPI1, &byte, 1);
-
-		ack = (byte == cmd[idx]) ? ACK : NACK;
-
-		SPI_SendData(SPI1, &ack, 1);
-
-		SPI_ReceiveData(SPI1, &dummy, 1);
-
-		printf("data received : %d\n", byte);
-
-		idx = (idx + 1) % 5;
-
-		SPI_ClearCRC(SPI1);
-	}
-
-	SPI_PCtrl(SPI1, PERIPH_DISABLE);
-
-	for(;;);
+        printf("Data received: %d | Sent ACK: 0x%X\n", cmd_rx, ack_tx);
+        idx = (idx + 1) % 5;
+    }
 }
-

@@ -216,6 +216,7 @@ PeriphStatus_t SPI_DeInit(SPI_RegDef_t *pSPIx);
  */
 PeriphStatus_t SPI_SendData(SPI_RegDef_t *pSPIx, uint8_t *pTxBuffer, uint32_t len);
 PeriphStatus_t SPI_ReceiveData(SPI_RegDef_t *pSPIx, uint8_t *pRxBuffer, uint32_t len);
+PeriphStatus_t SPI_TransmitReceiveData(SPI_RegDef_t *pSPIx, uint8_t *pTxBuffer, uint8_t *pRxBuffer, uint32_t len);
 
 /*
  * IRQ configuration and ISR handling

@@ -152,7 +152,6 @@ PeriphStatus_t SPI_SendData(SPI_RegDef_t *pSPIx, uint8_t *pTxBuffer, uint32_t le
 
     uint32_t ds = (pSPIx->CR2 >> SPI_CR2_DS) & 0xF;
     uint32_t dataSize = ds + 1;   // actual bits
-    uint8_t crc_en = (pSPIx->CR1 & (1 << SPI_CR1_CRCEN)) ? 1 : 0;
 
     while (len > 0)
     {
@@ -174,14 +173,8 @@ PeriphStatus_t SPI_SendData(SPI_RegDef_t *pSPIx, uint8_t *pTxBuffer, uint32_t le
             pTxBuffer++;
             len--;
         }
-
-        if (crc_en && len == 0)
-        {
-			pSPIx->CR1 |= (1 << SPI_CR1_CRCNEXT);
-        }
     }
 
-    while(SPI_GetFlagStatus(pSPIx, SPI_TXE_FLAG) == SPI_FLAG_RESET);
     while(SPI_GetFlagStatus(pSPIx, SPI_BUSY_FLAG));
 
     return status;
@@ -193,22 +186,13 @@ PeriphStatus_t SPI_ReceiveData(SPI_RegDef_t *pSPIx, uint8_t *pRxBuffer, uint32_t
     PeriphStatus_t status = PERIPH_OK;
 
     uint32_t ds = (pSPIx->CR2 >> SPI_CR2_DS) & 0xF;
-    uint8_t crc_en = (pSPIx->CR1 & (1 << SPI_CR1_CRCEN)) ? 1 : 0;
-	uint8_t crc_ff = (pSPIx->CR1 & (1 << SPI_CR1_CRCL)) ? 1 : 0;
     uint32_t dataSize = ds + 1;
+
 
     while (len > 0)
     {
         // 1. Wait until RXNE is set
         while (SPI_GetFlagStatus(pSPIx, SPI_RXNE_FLAG) == SPI_FLAG_RESET);
-
-        if (crc_en)
-        {
-        	if ((!crc_ff && len == 1) || (crc_ff && len == 2))
-			{
-        		pSPIx->CR1 |= (1 << SPI_CR1_CRCNEXT);
-			}
-        }
 
         if (dataSize > 8)
         {
@@ -228,22 +212,70 @@ PeriphStatus_t SPI_ReceiveData(SPI_RegDef_t *pSPIx, uint8_t *pRxBuffer, uint32_t
         }
     }
 
-    if (crc_en)
-    {
-    	if (SPI_GetFlagStatus(pSPIx, SPI_CRCERR_FLAG))
-    	{
-    		status = PERIPH_ERROR;
-    		pSPIx->SR &= ~(1 << SPI_SR_CRCERR);
-    	}
-
-    	volatile uint32_t dummy = pSPIx->DR;
-    	(void)dummy;
-    }
-
     while(SPI_GetFlagStatus(pSPIx, SPI_BUSY_FLAG));
 
     return status;
 }
+
+
+PeriphStatus_t SPI_TransmitReceiveData(SPI_RegDef_t *pSPIx, uint8_t *pTxBuffer, uint8_t *pRxBuffer, uint32_t len)
+{
+    uint32_t ds = (pSPIx->CR2 >> SPI_CR2_DS) & 0xF;
+    uint32_t dataSize = ds + 1;
+    uint8_t crc_en = (pSPIx->CR1 & (1 << SPI_CR1_CRCEN)) ? 1 : 0;
+    uint32_t tx_len = len;
+    uint32_t rx_len = len;
+
+    while (tx_len > 0 || rx_len > 0)
+    {
+        if (tx_len > 0 && SPI_GetFlagStatus(pSPIx, SPI_TXE_FLAG) == SPI_FLAG_SET) {
+            if (dataSize > 8) {
+                pSPIx->DR = *((uint16_t*)pTxBuffer);
+                pTxBuffer += 2; tx_len -= 2;
+            } else {
+                // Must cast to 8-bit pointer to prevent 16-bit FIFO packing!
+                *((volatile uint8_t*)&pSPIx->DR) = *pTxBuffer;
+                pTxBuffer++; tx_len--;
+            }
+
+            if (crc_en && tx_len == 0) {
+                pSPIx->CR1 |= (1 << SPI_CR1_CRCNEXT);
+            }
+        }
+
+        if (rx_len > 0 && SPI_GetFlagStatus(pSPIx, SPI_RXNE_FLAG) == SPI_FLAG_SET) {
+            if (dataSize > 8) {
+                *((uint16_t*)pRxBuffer) = pSPIx->DR;
+                pRxBuffer += 2; rx_len -= 2;
+            } else {
+                *pRxBuffer = *((volatile uint8_t*)&pSPIx->DR);
+                pRxBuffer++; rx_len--;
+            }
+        }
+    }
+
+    if(crc_en) {
+        while (SPI_GetFlagStatus(pSPIx, SPI_RXNE_FLAG) == SPI_FLAG_RESET);
+        if (SPI_GetFlagStatus(pSPIx, SPI_CRCERR_FLAG)) {
+            pSPIx->SR &= ~(1 << SPI_SR_CRCERR);
+            return PERIPH_ERROR;
+        }
+        volatile uint32_t dummy = pSPIx->DR;
+        (void)dummy;
+    }
+
+    while(SPI_GetFlagStatus(pSPIx, SPI_BUSY_FLAG) == SPI_FLAG_SET);
+    return PERIPH_OK;
+}
+
+// Add this to your C031 Driver too if it's missing!
+void SPI_ClearCRC(SPI_RegDef_t *pSPIx) {
+    pSPIx->CR1 &= ~(1 << SPI_CR1_SPE);
+    pSPIx->CR1 &= ~(1 << SPI_CR1_CRCEN);
+    pSPIx->CR1 |= (1 << SPI_CR1_CRCEN);
+    pSPIx->CR1 |= (1 << SPI_CR1_SPE);
+}
+
 
 /*
  * IRQ configuration and ISR handling
