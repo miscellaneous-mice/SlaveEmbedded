@@ -185,8 +185,11 @@ PeriphStatus_t I2C_PClkCtrl(I2C_RegDef_t *pI2Cx, PeriphState_t pState);
 PeriphStatus_t I2C_Init(I2C_Handle_t *pI2CHandle);
 PeriphStatus_t I2C_DeInit(I2C_RegDef_t *pI2Cx);
 
-PeriphStatus_t I2C_Master_SendData(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer, uint32_t len, uint16_t SlaveAddr);
-PeriphStatus_t I2C_Master_ReceiveData(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer, uint32_t len);
+PeriphStatus_t I2C_Master_SendData(I2C_Handle_t *pI2CHandle, uint8_t address, uint8_t *transmitBuffer, uint8_t size);
+PeriphStatus_t I2C_Master_ReceiveData(I2C_Handle_t *pI2CHandle,
+                                      uint8_t address,
+                                      uint8_t *readBuffer,
+                                      uint8_t size);
 
 PeriphStatus_t I2C_Slave_SendData(I2C_RegDef_t *pI2Cx, uint8_t *pTxBuffer, uint32_t len);
 PeriphStatus_t I2C_Slave_ReceiveData(I2C_RegDef_t *pI2Cx, uint8_t *pRxBuffer, uint32_t len);
