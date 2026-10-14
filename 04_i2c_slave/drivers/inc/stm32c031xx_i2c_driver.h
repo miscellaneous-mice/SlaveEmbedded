@@ -11,6 +11,8 @@
 #include <stddef.h>
 #include "stm32c031xx.h"
 
+#define I2C_TIMEOUT_TICKS   (100000U)
+
 typedef struct {
 	uint8_t PRESC_VALUE;
 	uint8_t SCLDEL_VALUE;

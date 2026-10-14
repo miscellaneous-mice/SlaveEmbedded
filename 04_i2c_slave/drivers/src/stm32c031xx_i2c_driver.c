@@ -43,41 +43,36 @@ PeriphStatus_t I2C_PClkCtrl(I2C_RegDef_t *pI2Cx, PeriphState_t pState)
  *   2. I2C_Init(pI2CHandle)                           - Programs filters, timings, OAR1, enables PE
  * Peripheral is immediately ready for communication.
  */
+
 PeriphStatus_t I2C_Init(I2C_Handle_t *pI2CHandle)
 {
     uint32_t tempreg = 0;
 
-    I2C_PClkCtrl(pI2CHandle->pI2Cx, PERIPH_ENABLE);
-
+    /* Check NULL pointers BEFORE dereferencing */
     if (pI2CHandle == NULL || pI2CHandle->pI2Cx == NULL)
     {
         return PERIPH_ERROR;
     }
 
-    /* 1. Ensure peripheral is disabled before modifying TIMINGR, OAR1, or CR1 filters
-     * (RM0490 Section 25.4.5, 25.9.5, Figure 225) */
-    pI2CHandle->pI2Cx->CR1 &= ~(1U << I2C_CR1_PE);
+    I2C_PClkCtrl(pI2CHandle->pI2Cx, PERIPH_ENABLE);
 
-    /* RM0490 page 10 Note: Wait/read back to ensure PE=0 has propagated through APB */
+    /* 1. Ensure peripheral is disabled before modifying registers */
+    pI2CHandle->pI2Cx->CR1 &= ~(1U << I2C_CR1_PE);
     while (pI2CHandle->pI2Cx->CR1 & (1U << I2C_CR1_PE));
 
-    /* 2. Configure Noise Filters (RM0490 Figure 225 & Section 25.4.5)
-     * ANFOFF = 0: Analog noise filter enabled (suppresses spikes <= 50ns)
-     * DNF[3:0] = 0: Digital filter disabled */
+    /* 2. Configure Noise Filters */
     pI2CHandle->pI2Cx->CR1 &= ~((1U << I2C_CR1_ANFOFF) | (0xFU << I2C_CR1_DNF));
 
-    /* 3. Configure Timing Register (RM0490 25.9.5, Page 58) */
+    /* 3. Configure Timing Register */
     tempreg = 0;
     tempreg |= ((uint32_t)(pI2CHandle->I2C_Config.I2C_SCL.PRESC_VALUE  & 0x0FU) << 28);
     tempreg |= ((uint32_t)(pI2CHandle->I2C_Config.I2C_SCL.SCLDEL_VALUE & 0x0FU) << 20);
     tempreg |= ((uint32_t)(pI2CHandle->I2C_Config.I2C_SCL.SDADEL_VALUE & 0x0FU) << 16);
     tempreg |= ((uint32_t)(pI2CHandle->I2C_Config.I2C_SCL.SCLH_VALUE   & 0xFFU) << 8);
     tempreg |= ((uint32_t)(pI2CHandle->I2C_Config.I2C_SCL.SCLL_VALUE   & 0xFFU));
-
     pI2CHandle->pI2Cx->TIMINGR = tempreg;
 
-    /* 4. Configure Own Address 1 (RM0490 25.9.3, Page 56 & Figure 228, Page 14) */
-    /* Step 4a: Disable OA1EN first - OA1[9:0] & OA1MODE are write-protected if OA1EN=1 */
+    /* 4. Configure Own Address 1 */
     pI2CHandle->pI2Cx->OAR1 &= ~(1U << 15);
 
     if (pI2CHandle->I2C_Config.I2C_DeviceAddress != 0)
@@ -85,33 +80,26 @@ PeriphStatus_t I2C_Init(I2C_Handle_t *pI2CHandle)
         tempreg = 0;
         if (pI2CHandle->I2C_Config.I2C_DeviceAddress <= 0x7F)
         {
-            /* 7-bit mode: address is placed in OA1[7:1] */
             tempreg |= ((uint32_t)pI2CHandle->I2C_Config.I2C_DeviceAddress << 1);
         }
         else
         {
-            /* 10-bit mode: OA1MODE = 1, address in OA1[9:0] */
             tempreg |= (1U << 10);
             tempreg |= (pI2CHandle->I2C_Config.I2C_DeviceAddress & 0x3FFU);
         }
-
-        /* Step 4b: Write address and assert OA1EN in OAR1 */
         tempreg |= (1U << 15); /* OA1EN = 1 */
         pI2CHandle->pI2Cx->OAR1 = tempreg;
     }
     else
     {
-        pI2CHandle->pI2Cx->OAR1 = 0; /* Keep target address disabled for master-only */
+        pI2CHandle->pI2Cx->OAR1 = 0;
     }
 
-//    pI2CHandle->pI2Cx->CR1 |= (1U << I2C_CR1_SBC);
-
-    /* 5. Enable Peripheral (RM0490 Figure 225 Step 6) */
+    /* 5. Enable Peripheral */
     pI2CHandle->pI2Cx->CR1 |= (1U << I2C_CR1_PE);
 
     return PERIPH_OK;
 }
-
 
 PeriphStatus_t I2C_DeInit(I2C_RegDef_t *pI2Cx)
 {
@@ -271,86 +259,80 @@ PeriphStatus_t I2C_Master_ReceiveData(I2C_Handle_t *pI2CHandle,
 PeriphStatus_t I2C_Slave_SendData(I2C_RegDef_t *pI2Cx, uint8_t *pTxBuffer, uint32_t len)
 {
     uint32_t count = 0;
-    uint16_t address;
+    uint32_t timeout;
 
     if (pI2Cx == NULL || pTxBuffer == NULL)
         return PERIPH_ERROR;
 
-    /* 1. Wait for address match (RM0490 Figure 229) */
+    /* 1. Wait for address match */
     while (!I2C_GetFlagStatus(pI2Cx, I2C_FLAG_ADDR));
 
-    address = ((pI2Cx->ISR & I2C_FLAG_ADDCODE) >> I2C_ISR_ADDCODE);
-
-    /* 2. DIR=1 means controller wants to read from us. If writing (DIR=0), abort. */
+    /* 2. DIR=1 means controller wants to read from us. If write (DIR=0), abort */
     if (!I2C_GetFlagStatus(pI2Cx, I2C_FLAG_DIR))
     {
-        pI2Cx->ICR |= (1U << I2C_ICR_ADDRCF);
+        pI2Cx->ICR = (1U << I2C_ICR_ADDRCF);
         return PERIPH_ERROR;
     }
 
-    /* 3. Flush any stale byte left in TXDR before releasing SCL (RM0490 25.4.8) */
-    pI2Cx->ISR |= (1U << I2C_ISR_TXE);
+    /* 3. Flush stale byte in TXDR before releasing SCL */
+    pI2Cx->ISR = (1U << I2C_ISR_TXE);
 
-    /* 4. Clear ADDR to release the SCL clock stretch */
-    pI2Cx->ICR |= (1U << I2C_ICR_ADDRCF);
+    /* 4. Clear ADDR and clear any stale flags */
+    pI2Cx->ICR = (1U << I2C_ICR_ADDRCF) | (1U << I2C_ICR_STOPCF) | (1U << I2C_ICR_NACKCF);
 
     /* 5. Transfer loop */
     while (1)
     {
-        /* Check for unrecoverable bus faults during transmission */
-//        if (I2C_GetFlagStatus(pI2Cx, I2C_FLAG_ARLO) || I2C_GetFlagStatus(pI2Cx, I2C_FLAG_BERR))
-//        {
-//            pI2Cx->ICR |= (1U << I2C_ICR_ARLOCF) | (1U << I2C_ICR_BERRCF);
-//            pI2Cx->ISR |= (1U << I2C_ISR_TXE);
-//            return PERIPH_ERROR;
-//        }
-
-        /* Controller sent NACK: Normal end of read request */
+        /* Case A: Controller sent NACK */
         if (I2C_GetFlagStatus(pI2Cx, I2C_FLAG_NACKF))
         {
-            pI2Cx->ICR |= (1U << I2C_ICR_NACKCF);
+            pI2Cx->ICR = (1U << I2C_ICR_NACKCF);
 
-            /* Wait for the bus cycle to terminate with STOP or Repeated START */
-//            while (!I2C_GetFlagStatus(pI2Cx, I2C_FLAG_STOPF) &&
-//                   !I2C_GetFlagStatus(pI2Cx, I2C_FLAG_ADDR)  &&
-//                   !I2C_GetFlagStatus(pI2Cx, I2C_FLAG_ARLO)  &&
-//                   !I2C_GetFlagStatus(pI2Cx, I2C_FLAG_BERR));
+            /* Wait for STOP condition or Repeated START with timeout guard */
+            timeout = I2C_TIMEOUT_TICKS;
+            while (!I2C_GetFlagStatus(pI2Cx, I2C_FLAG_STOPF) &&
+                   !I2C_GetFlagStatus(pI2Cx, I2C_FLAG_ADDR))
+            {
+                if (--timeout == 0U)
+                {
+                    pI2Cx->ISR = (1U << I2C_ISR_TXE);
+                    return PERIPH_ERROR;
+                }
+            }
 
             if (I2C_GetFlagStatus(pI2Cx, I2C_FLAG_STOPF))
             {
-                pI2Cx->ICR |= (1U << I2C_ICR_STOPCF);
+                pI2Cx->ICR = (1U << I2C_ICR_STOPCF);
             }
 
-            pI2Cx->ISR |= (1U << I2C_ISR_TXE); /* Flush TXDR */
+            pI2Cx->ISR = (1U << I2C_ISR_TXE);
             break;
         }
 
-        /* Direct STOP condition */
+        /* Case B: Direct STOP */
         if (I2C_GetFlagStatus(pI2Cx, I2C_FLAG_STOPF))
         {
-            pI2Cx->ICR |= (1U << I2C_ICR_STOPCF);
-            pI2Cx->ISR |= (1U << I2C_ISR_TXE);
+            pI2Cx->ICR = (1U << I2C_ICR_STOPCF);
+            pI2Cx->ISR = (1U << I2C_ISR_TXE);
             break;
         }
 
-        /* Repeated START: Hand off to subsequent call without clearing ADDR */
+        /* Case C: Repeated START */
         if (I2C_GetFlagStatus(pI2Cx, I2C_FLAG_ADDR))
         {
-            pI2Cx->ISR |= (1U << I2C_ISR_TXE);
+            pI2Cx->ISR = (1U << I2C_ISR_TXE);
             break;
         }
 
-        /* Transmit register empty and ready for data */
+        /* Case D: TXIS ready for next byte */
         if (I2C_GetFlagStatus(pI2Cx, I2C_FLAG_TXIS))
         {
             pI2Cx->TXDR = (count < len) ? pTxBuffer[count++] : 0xFFU;
-            printf("Got byte...\n");
         }
     }
 
     return PERIPH_OK;
 }
-
 
 PeriphStatus_t I2C_Slave_ReceiveData(I2C_RegDef_t *pI2Cx, uint8_t *pRxBuffer, uint32_t len)
 {
@@ -359,30 +341,28 @@ PeriphStatus_t I2C_Slave_ReceiveData(I2C_RegDef_t *pI2Cx, uint8_t *pRxBuffer, ui
     if (pI2Cx == NULL || pRxBuffer == NULL)
         return PERIPH_ERROR;
 
-    /* 1. Wait for address match (RM0490 Figure 232) */
+    /* 1. Wait for address match */
     while (!I2C_GetFlagStatus(pI2Cx, I2C_FLAG_ADDR));
 
-    /* 2. DIR=0 means controller wants to write. If reading (DIR=1), abort. */
+    /* 2. DIR=0 means controller wants to write. If read (DIR=1), abort */
     if (I2C_GetFlagStatus(pI2Cx, I2C_FLAG_DIR))
     {
-        pI2Cx->ICR |= (1U << I2C_ICR_ADDRCF);
+        pI2Cx->ICR = (1U << I2C_ICR_ADDRCF);
         return PERIPH_ERROR;
     }
 
-    /* 3. Clear ADDR to release the SCL clock stretch */
-    pI2Cx->ICR |= (1U << I2C_ICR_ADDRCF);
+    /* 3. Discard any stale byte left in RXDR while SCL is still stretched */
+    if (I2C_GetFlagStatus(pI2Cx, I2C_FLAG_RXNE))
+    {
+        (void)pI2Cx->RXDR;
+    }
 
-    /* 4. Receive loop */
+    /* 4. Clear ADDR and clear any stale STOPF */
+    pI2Cx->ICR = (1U << I2C_ICR_ADDRCF) | (1U << I2C_ICR_STOPCF);
+
+    /* 5. Receive loop */
     while (1)
     {
-        /* Bus error check during active reception */
-//        if (I2C_GetFlagStatus(pI2Cx, I2C_FLAG_ARLO) || I2C_GetFlagStatus(pI2Cx, I2C_FLAG_BERR))
-//        {
-//            pI2Cx->ICR |= (1U << I2C_ICR_ARLOCF) | (1U << I2C_ICR_BERRCF);
-//            return PERIPH_ERROR;
-//        }
-
-        /* Priority 1: Drain RXDR whenever new data is available */
         if (I2C_GetFlagStatus(pI2Cx, I2C_FLAG_RXNE))
         {
             uint8_t received = (uint8_t)(pI2Cx->RXDR);
@@ -391,19 +371,22 @@ PeriphStatus_t I2C_Slave_ReceiveData(I2C_RegDef_t *pI2Cx, uint8_t *pRxBuffer, ui
                 pRxBuffer[count++] = received;
             }
         }
-        /* Priority 2: Controller completed transmission via STOP */
         else if (I2C_GetFlagStatus(pI2Cx, I2C_FLAG_STOPF))
         {
-            pI2Cx->ICR |= (1U << I2C_ICR_STOPCF);
+            pI2Cx->ICR = (1U << I2C_ICR_STOPCF);
             break;
         }
-        /* Priority 3: Repeated START */
         else if (I2C_GetFlagStatus(pI2Cx, I2C_FLAG_ADDR))
         {
             break;
         }
     }
 
+    /* 6. Verify full packet received */
+    if (count < len)
+    {
+        return PERIPH_ERROR;
+    }
+
     return PERIPH_OK;
 }
-
